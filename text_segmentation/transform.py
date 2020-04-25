@@ -1,5 +1,9 @@
 import numpy as np
 import cv2
+import argparse
+import imutils
+
+from skimage.filters import threshold_local
 
 '''
     Takes in one argument pts which is a list of 4 points of (x,y) coordinates of each point in rectangle 
@@ -7,7 +11,7 @@ import cv2
         1st: top-left, 2nd: top-right, 3rd: bottom-right, 4th: bottom-left
 '''
 def order_points(pts):
-    rectangle = np.zeroes((4, 2),dtype="float32")
+    rectangle = np.zeros((4, 2),dtype="float32")
 
     # the top-left point will have the smallest x + y sum
     # the bottom-right point will have the largest sum
@@ -53,3 +57,94 @@ def four_point_transform(image, pts):
     warped = cv2.warpPerspective(image, Matrix, (new_width, new_height))
 
     return warped
+
+def edge_detection(img):
+    pass
+
+if __name__ == "__main__":
+    # Argument parser
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-i", "--image", required = True, help="Path to the image that's to be scanned")
+    args = vars(ap.parse_args())
+
+    ### Edge detection ###
+    # load image and compute ratio of old height to new height, then resize it
+    image = cv2.imread(args["image"])
+    ratio = image.shape[0] / 500.0
+    og_img = image.copy()
+    image = imutils.resize(image, height = 500)
+
+    # Convert image to grascale, then blur, to find edges
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = cv2.GaussianBlur(gray, (5, 5), 0)
+    edged = cv2.Canny(gray, 75, 200)
+
+    #cv2.imshow("Original: ", image)
+    #cv2.imshow("Edged: ", edged)
+    #cv2.waitKey(0)
+    #cv2.destroyAllWindows()
+
+    ### Finding contours ###
+    # Find contours in edged image, keep only largest ones
+    conts = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    conts = imutils.grab_contours(conts)
+
+    # Get yo contours here
+    conts = sorted(conts, key = cv2.contourArea, reverse=True)[:5]
+
+    # Loop over contours, approximate the number of points in that contour
+    screenCont = []
+    print("AAA")
+    for c in conts:
+        # Approximate the contours
+        peri = cv2.arcLength(c, True)
+        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+        print("BBB")
+        # If our contour has 4 points, assume we've found document
+        if len(approx) == 4:
+            print("CCC")
+            screenCont = approx
+            print("SCREENCONT: ", screenCont)
+            break
+
+    if screenCont == []:
+        print("Unable to detect document in your image")
+        exit()
+
+
+    #cv2.drawContours(image, screenCont, -1, (0, 255, 0), 2)
+    cv2.drawContours(image, [screenCont], -1, (0,255,0),2)
+    #cv2.imgshow("Outline", image)
+    #cv2.waitKey(0)
+    #cv2.destroyAllWindows()
+
+
+    ### Perspective transform and threshold ###
+    #warped = four_point_transform(og_img, screenCont.reshape(4,2) * ratio)
+    warped = four_point_transform(og_img, screenCont.reshape(4,2) * ratio)
+
+    # Convert warped to graysacle, then threshold it to give "black and white" effect
+    warped = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+    T = threshold_local(warped, 11, offset=10, method="gaussian")
+    warped = (warped > T).astype("uint8") * 255
+
+    # Apply transform
+    cv2.imshow("Original", imutils.resize(og_img, height=650))
+    cv2.imshow("Scanned", imutils.resize(warped, height=650))
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    print("KEK")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
