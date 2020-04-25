@@ -59,20 +59,15 @@ def four_point_transform(image, pts):
     return warped
 
 def edge_detection(img):
-    pass
-
-if __name__ == "__main__":
-    # Argument parser
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-i", "--image", required = True, help="Path to the image that's to be scanned")
-    args = vars(ap.parse_args())
-
     ### Edge detection ###
     # load image and compute ratio of old height to new height, then resize it
-    image = cv2.imread(args["image"])
+    image = cv2.imread(img)
+
+    # Ratio of old height + original image
     ratio = image.shape[0] / 500.0
     og_img = image.copy()
-    image = imutils.resize(image, height = 500)
+
+    image = imutils.resize(image, height=500)
 
     # Convert image to grascale, then blur, to find edges
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -84,7 +79,9 @@ if __name__ == "__main__":
     #cv2.waitKey(0)
     #cv2.destroyAllWindows()
 
-    ### Finding contours ###
+    return edged, og_img, ratio
+
+def find_contours(edged):
     # Find contours in edged image, keep only largest ones
     conts = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     conts = imutils.grab_contours(conts)
@@ -111,29 +108,41 @@ if __name__ == "__main__":
         print("Unable to detect document in your image")
         exit()
 
-
     #cv2.drawContours(image, screenCont, -1, (0, 255, 0), 2)
-    cv2.drawContours(image, [screenCont], -1, (0,255,0),2)
+    #cv2.drawContours(image, [screenCont], -1, (0,255,0),2)
     #cv2.imgshow("Outline", image)
     #cv2.waitKey(0)
     #cv2.destroyAllWindows()
 
+    return screenCont
 
+def warp_and_save(original, ratio):
     ### Perspective transform and threshold ###
-    #warped = four_point_transform(og_img, screenCont.reshape(4,2) * ratio)
-    warped = four_point_transform(og_img, screenCont.reshape(4,2) * ratio)
+    warped = four_point_transform(original, contours.reshape(4, 2) * ratio)
 
     # Convert warped to graysacle, then threshold it to give "black and white" effect
     warped = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
     T = threshold_local(warped, 11, offset=10, method="gaussian")
     warped = (warped > T).astype("uint8") * 255
 
-    # Apply transform
-    cv2.imshow("Original", imutils.resize(og_img, height=650))
-    cv2.imshow("Scanned", imutils.resize(warped, height=650))
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-    print("KEK")
+    cv2.imwrite("result.jpg", imutils.resize(warped))
+
+
+if __name__ == "__main__":
+    # Argument parser
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-i", "--image", required = True, help="Path to the image that's to be scanned")
+    args = vars(ap.parse_args())
+
+    # Pass through path to image to edge detection
+    edged, og_img, ratio = edge_detection(args["image"])
+
+    # Find contours
+    contours = find_contours(edged)
+
+    warp_and_save(og_img, ratio)
+
+
 
 
 
