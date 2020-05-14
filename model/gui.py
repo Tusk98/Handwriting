@@ -1,11 +1,11 @@
 from keras.models import load_model
 from tkinter import *
 import tkinter as tk
-#import win32gui
+import win32gui
 from PIL import ImageGrab, Image
 import numpy as np
 
-model = load_model('mnist.h5')
+model = load_model('digits.h5')
 
 
 def predict_digit(img):
